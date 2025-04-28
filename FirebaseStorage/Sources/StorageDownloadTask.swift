@@ -156,28 +156,34 @@ open class StorageDownloadTask: StorageObservableTask, StorageTaskManagement {
       }
     }
     self.fetcher = fetcher
-    state = .running
-    do {
-      let data = try await self.fetcher?.beginFetch()
-      // Fire last progress updates
-      fire(for: .progress, snapshot: snapshot)
 
-      // Download completed successfully, fire completion callbacks
-      state = .success
-      if let data {
-        downloadData = data
+    // Capture self here to retain until completion.
+    self.fetcherCompletion = { [weak self] (data: Data?, error: NSError?) in
+      guard let self = self else { return }
+      defer {
+        self.removeAllObservers()
+        self.fetcherCompletion = nil
       }
-      fire(for: .success, snapshot: snapshot)
-    } catch {
-      fire(for: .progress, snapshot: snapshot)
-      state = .failed
-      self.error = StorageErrorCode.error(
-        withServerError: error as NSError,
-        ref: reference
-      )
-      fire(for: .failure, snapshot: snapshot)
+      self.fire(for: .progress, snapshot: self.snapshot)
+
+      // Handle potential issues with download
+      if let error {
+        self.state = .failed
+        self.error = StorageErrorCode.error(withServerError: error, ref: self.reference)
+        self.fire(for: .failure, snapshot: self.snapshot)
+        return
+      }
+      // Download completed successfully, fire completion callbacks
+      self.state = .success
+      if let data {
+        self.downloadData = data
+      }
+      self.fire(for: .success, snapshot: self.snapshot)
     }
-    removeAllObservers()
+    self.state = .running
+    self.fetcher?.beginFetch { [weak self] data, error in
+      self?.fetcherCompletion?(data, error as? NSError)
+    }
   }
 
   func cancel(withError error: NSError) {

@@ -38,11 +38,11 @@ enum StorageListTask {
     // items
     // to return per page. This removes the need to backfill results if Firebase Storage filters
     // objects that are considered invalid (such as items with two consecutive slashes).
-    if let pageSize {
+    if let pageSize = pageSize {
       queryParams["maxResults"] = "\(pageSize)"
     }
 
-    if let previousPageToken {
+    if let previousPageToken = previousPageToken {
       queryParams["pageToken"] = previousPageToken
     }
 
